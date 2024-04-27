@@ -59,6 +59,11 @@ workflow genotype_wf {
     generateGenotype(params.vcf)
 }
 
+workflow {
+    // pseudobulk_wf()
+    genotype_wf()
+}
+
 
 process eQTL {
     executor 'pbspro'
