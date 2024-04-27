@@ -1,7 +1,7 @@
 
 nextflow.enable.dsl=2
 
-includeConfig "${baseDir}/config_files/imperial_custom_config"
+include "${baseDir}/config_files/imperial_custom_config" as config
 
 
 params.rscript1 = "path/to/your/first/rscript"
