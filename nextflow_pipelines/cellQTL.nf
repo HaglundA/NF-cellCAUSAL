@@ -6,7 +6,7 @@ params.rscript2 = "path/to/your/second/rscript"
 params.rscript3 = "path/to/your/third/rscript"
 
 params.matrix = "path/to/your/matrix"
-params.vcf = "path/to/your/vcf"
+params.vcf = "/rds/general/user/ah3918/projects/roche/live/ALEX/PROCESSED_DATA/PROCESSED_GENOTYPE/FINAL/final_geno_440samples_renamedsamples_sorted.vcf.gz "
 
 params.outdir="/rds/general/user/ah3918/ephemeral/cellCAUSAL_TEST/"
 process pseudobulk {
@@ -36,7 +36,6 @@ process generateGenotype {
 
     input:
     path vcf
-    path rscript
 
     output:
     path "genotype_012mat.csv", emit: genotype_results
