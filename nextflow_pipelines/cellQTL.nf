@@ -34,7 +34,7 @@ process pseudobulk {
 
 process generateGenotype {
     module "anaconda3/personal"
-    conda ${params.conda_env_path}
+    conda "$params.conda_env_path"
 
     executor 'pbspro'
     clusterOptions = '-lselect=1:ncpus=20:mem=240gb -l walltime=3:00:00'
