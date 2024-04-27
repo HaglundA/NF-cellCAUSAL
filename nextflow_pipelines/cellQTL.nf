@@ -1,4 +1,9 @@
 
+nextflow.enable.dsl=2
+
+includeConfig "${baseDir}/config_files/imperial_custom_config"
+
+
 params.rscript1 = "path/to/your/first/rscript"
 params.rscript2 = "path/to/your/second/rscript"
 params.rscript3 = "path/to/your/third/rscript"
@@ -7,15 +12,18 @@ params.matrix = "path/to/your/matrix"
 params.vcf = "path/to/your/vcf"
 
 params.outdir="/rds/general/user/ah3918/ephemeral/cellCAUSAL_TEST/"
-
 process pseudobulk {
+    executor 'pbspro'
+    clusterOptions = '-lselect=1:ncpus=40:mem=480gb -l walltime=5:00:00'
+    conda '/rds/general/user/ah3918/home/anaconda3/envs/OSIRIS'
+
     input:
-    path matrix from params.matrix
-    path rscript from params.rscript1
+    path matrix
+    path rscript
 
     output:
-    path "*_pseudobulk.csv" into pseudobulk_results
-    path "*_gene_locations.csv" into gene_locations
+    path "*_pseudobulk.csv", emit: pseudobulk_results
+    path "*_gene_locations.csv", emit: gene_locations
 
     script:
     """
@@ -24,38 +32,49 @@ process pseudobulk {
 }
 
 process generateGenotype {
-
-    module "anaconda3/personal"
-    conda "/rds/general/user/ah3918/home/anaconda3/envs/OSIRIS"
-    executor="pbspro"
-    clusterOptions = "-lselect=1:ncpus=40:mem=480gb -l walltime=5:00:00"
-    publishDir "${params.outdir}/MatrixEQTL_IO", mode: "copy"
+    executor 'pbspro'
+    clusterOptions = '-lselect=1:ncpus=20:mem=240gb -l walltime=3:00:00'
+    conda '/rds/general/user/ah3918/home/anaconda3/envs/OSIRIS'
+    publishDir "${params.outdir}/MatrixEQTL_IO", mode: 'copy'
 
     input:
-    path vcf from params.vcf
-    path rscript from params.rscript2
+    path vcf
+    path rscript
 
     output:
-    path "genotype_012mat.csv" into genotype_results
-    path "snp_chromlocations.csv" into snp_chromlocations
+    path "genotype_012mat.csv", emit: genotype_results
+    path "snp_chromlocations.csv", emit: snp_chromlocations
 
     script:
     """
     Rscript ${baseDir}/cellQTL_scripts/genotype/generate_genotype_matrix.r \
     --script_dir ${baseDir}/cellQTL_scripts/genotype \
     --vcf $vcf \
-    --ncores 8
+    --ncores 10
     """
 }
 
+workflow pseudobulk_wf {
+    pseudobulk(params.matrix)
+}
+
+workflow genotype_wf {
+    generateGenotype(params.vcf)
+}
+
+
 process eQTL {
+    executor 'pbspro'
+    clusterOptions = '-lselect=1:ncpus=40:mem=480gb -l walltime=5:00:00'
+    conda '/rds/general/user/ah3918/home/anaconda3/envs/OSIRIS'
+
     input:
-    path pseudobulk_output from pseudobulk_results
-    path genotype_output from genotype_results
-    path rscript from params.rscript3
+    path pseudobulk_output
+    path genotype_output
+    path rscript
 
     output:
-    path "eQTL_output"
+    path "eQTL_output", emit: eqtl_output
 
     script:
     """
@@ -63,56 +82,6 @@ process eQTL {
     """
 }
 
-
-process pseudobulk {
-    input:
-    path matrix from params.matrix
-    path rscript from params.rscript1
-
-    output:
-    path "*_pseudobulk.csv" into pseudobulk_results
-    path "*_gene_locations.csv" into gene_locations
-
-    script:
-    """
-    Rscript $rscript $matrix
-    """
-}
-
-process generateGenotype {
-    input:
-    path vcf from params.vcf
-    path rscript from params.rscript2
-
-    output:
-    path "genotype_012mat.csv" into genotype_results
-    path "snp_chromlocations.csv" into snp_chromlocations
-
-    script:
-    """
-    Rscript $rscript $vcf
-    """
-}
-
-process eQTL {
-    input:
-    tuple path(pseudobulk_output), path(gene_locations) from pseudobulk_and_gene_locations
-    path genotype_output from genotype_results
-    path snp_chromlocations from snp_chromlocations
-    path rscript from params.rscript3
-
-    output:
-    path "eQTL_output"
-
-    script:
-    """
-    Rscript $rscript $pseudobulk_output $genotype_output $snp_chromlocations $gene_locations
-    """
-}
-
-workflow {
-    pseudobulk(params.matrix, params.rscript1)
-    generateGenotype(params.vcf, params.rscript2)
-    pseudobulk_and_gene_locations = pseudobulk_results.zip(gene_locations)
-    eQTL.each(pseudobulk_and_gene_locations, generateGenotype.out[0], generateGenotype.out[1], params.rscript3)
+workflow eqtl_wf {
+    eQTL(params.rscript3)
 }
