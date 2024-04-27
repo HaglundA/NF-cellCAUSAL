@@ -6,6 +6,8 @@ params.rscript3 = "path/to/your/third/rscript"
 params.matrix = "path/to/your/matrix"
 params.vcf = "path/to/your/vcf"
 
+params.outdir="/rds/general/user/ah3918/ephemeral/cellCAUSAL_TEST/"
+
 process pseudobulk {
     input:
     path matrix from params.matrix
@@ -22,6 +24,13 @@ process pseudobulk {
 }
 
 process generateGenotype {
+
+    module "anaconda3/personal"
+    conda "/rds/general/user/ah3918/home/anaconda3/envs/OSIRIS"
+    executor="pbspro"
+    clusterOptions = "-lselect=1:ncpus=40:mem=480gb -l walltime=5:00:00"
+    publishDir "${params.outdir}/MatrixEQTL_IO", mode: "copy"
+
     input:
     path vcf from params.vcf
     path rscript from params.rscript2
@@ -32,7 +41,10 @@ process generateGenotype {
 
     script:
     """
-    Rscript $rscript $vcf
+    Rscript ${baseDir}/cellQTL_scripts/genotype/generate_genotype_matrix.r \
+    --script_dir ${baseDir}/cellQTL_scripts/genotype \
+    --vcf $vcf \
+    --ncores 8
     """
 }
 

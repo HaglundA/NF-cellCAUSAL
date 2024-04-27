@@ -1,4 +1,3 @@
-
 library(SCGsuite)
 library(argparse)
 
@@ -26,23 +25,11 @@ summarize_outputs_cis=function(outpath){
   message("Saving MatrixEQTL outputs as list object..")
   saveRDS(mateqtlouts,"mateqtlouts.rds")
 
-  res<-lapply(mateqtlouts,get_info)
-  res<-as.data.frame(do.call(cbind,res))
-  colnames(res)<-cellnames
-
-  unique<-get_unique(mateqtlouts)
-  res$total<-rowSums(res)
-  res$unique<-unique
-
   mateqtlouts<-lapply(mateqtlouts,function(x){
     x<-x[x$FDR<0.2,]
     return(x)
   })
   saveRDS(mateqtlouts,"mateqtlouts_0.2FDR.rds")
-
-  write.table(res,"summary_cis_eQTL_numbers.txt")
-
-
 }
 
 

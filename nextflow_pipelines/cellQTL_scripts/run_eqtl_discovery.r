@@ -1,9 +1,6 @@
-
-
-
-
 suppressMessages(library(argparse))
-library(SCGsuite)
+
+
 
 
 ###########################################################
@@ -11,7 +8,7 @@ library(SCGsuite)
 ###########################################################
 parser <- ArgumentParser()
 
-
+parser$add_argument("--script_dir", help = "path to scripts directory")
 ##### input files
 ###########################################################
 
@@ -21,7 +18,6 @@ parser$add_argument("--geno_mat", help = "Genotype dosage matrix (0,1,2) path")
 parser$add_argument("--exp_loc", help = "Gene locations path")
 parser$add_argument("--geno_loc", help = "SNP locations path")
 parser$add_argument("--cov_file", help = "Covariate file")
-parser$add_argument("--run_name", help = "Run name")
 parser$add_argument("--covs_to_include",nargs="+",help = "")
 
 
@@ -54,7 +50,6 @@ name=gsub("_pseudobulk.csv","",name)
 geno_mat=args$geno_mat
 exp_loc=args$exp_loc
 geno_loc=args$geno_loc
-run_id=args$run_name
 cov_file=args$cov_file
 if(length(cov_file)==0){
   cov_file=""
@@ -63,10 +58,11 @@ if(length(cov_file)==0){
   cov_file_included=TRUE
 }
 
+script_dir=args$script_dir
+source(paste0(script_dir,"/matrix_eqtl_funcs.r"))
 
 covs=args$covs_to_include
 print(covs)
-
 
 ##### processing params
 ###########################################################
@@ -79,13 +75,8 @@ if(trans_eqtls=="true"){
   trans_eqtls=FALSE
 }
 
-# filter_genotype_matrix=TRUE
 geno_filter_type="2.2"
-# filter_pseudobulk=TRUE
 filter_pseudobulk_thresh=as.numeric(args$exp_mat_thresh_percent)
-# specify_genes=FALSE
-# specify_genes_list=NULL
-# specify_samples=FALSE
 if (!is.null(args$specify_samples_file)) {
   # Read the file and store the samples in specify_samples_vector
   specify_samples_vector <- readLines(args$specify_samples_file)
@@ -151,14 +142,13 @@ get_residuals=function(exp_mat,covs_to_include,cov_file){
 
 
 
-  ###run the model, extract residuals
-  lmmodel=paste0("gene~",paste(covs_to_include,collapse="+"),collapse="")
-  message(paste0("Obtaining residuals using lm(): "),lmmodel)
+lmmodel = paste0("gene ~ ", paste(covs_to_include, collapse = " + "))
+
   exp_mat=t(apply(exp_mat,1,function(x){
       
     lm_mat=data.frame(gene=x)
     lm_mat=cbind(lm_mat,covmat)
-      lmmodel=paste0("gene~",paste(covs_to_include,collapse="+"),collapse="")
+      # fit=lmerTest::lmer(lmmodel,lm_mat)
       fit=lm(lmmodel,lm_mat)
       resid(fit)
     
@@ -189,7 +179,6 @@ if(trans_eqtls==TRUE){
 
 covadj_matrixeqtl=TRUE
 covadj_pc_matrixeqtl=TRUE
-covadj_pcs_n_matrixeqtl=5
 geno_pc_adj=TRUE
 geno_pcs_n=3
 
@@ -294,28 +283,6 @@ scaled<-scale(t(exp_mat),scale=T,center=F)
 exp_mat<-as.data.frame(t(scaled))
 
 
-####################################
-### GET PCS ###
-####################################
-
-if(ncol(exp_mat)<100){
-    down_signif <- function(x, digits = 0) {
-        m <- 10^(ceiling(log(x, 10)) - digits)
-        (x %/% m)*m
-      }
-    
-    max_pcs=down_signif(ncol(exp_mat),1)/10
-}else{
-    max_pcs=10
-}
-message("Getting PCs...")
-pcs<-prcomp(exp_mat,scale=F,center=F)
-pcs<-pcs$rotation
-pcs<-pcs[,1:(max_pcs*10)]
-pcs<-t(pcs)
-pcs<-pcs[,colnames(exp_mat)]
-rownames(pcs)<-paste0(rep("PC."),1:(max_pcs*10))
-write.table(pcs,paste0(name,"_full_expression_PCs.txt"))
 
 ####################################
 ### GET GENO PCS ###
@@ -337,14 +304,8 @@ if(get_exp_residuals==TRUE){
   message("You must supply a covariate file to obtain corrected expression residuals.")
  }else{
   message(paste0("Correcting expression matrix for known covariates.\nUser-defined covariates: '",paste(covs,collapse=", "),"'"))  
-
-  #  if(is.null(ref_levels)==FALSE){
-  #   message(paste0("Ref levels set. Re-ordering data frame to set the reference factor levels as:\n"))
-  #   print(data.frame(covs,ref_levels))
-  #  }
-
-  lmmodel=paste0("gene~",paste(covs,collapse="+"),collapse="")
-  message(paste0("Obtaining residuals using lm(): "),lmmodel)
+covs_to_include=covs
+lmmodel = paste0("gene ~ ", paste(covs_to_include, collapse = " + "))
 
   exp_mat=suppressMessages(get_residuals(exp_mat,
   covs_to_include=covs,
@@ -353,6 +314,34 @@ if(get_exp_residuals==TRUE){
   write.table(exp_mat,paste0(name,"_residuals_pseudobulk.csv"))
   }
 }
+
+####################################
+### GET PCS ###
+####################################
+
+if(ncol(exp_mat)<100){
+    down_signif <- function(x, digits = 0) {
+        m <- 10^(ceiling(log(x, 10)) - digits)
+        (x %/% m)*m
+      }
+    
+    max_pcs=down_signif(ncol(exp_mat),1)/10
+}else{
+    max_pcs=10
+}
+message("Getting PCs...")
+pcs<-prcomp(exp_mat,scale=F,center=F)
+pcs<-pcs$rotation
+pcs<-pcs[,1:(max_pcs*10)]
+pcs<-t(pcs)
+pcs<-pcs[,colnames(exp_mat)]
+rownames(pcs)<-paste0(rep("PC."),1:(max_pcs*10))
+if(get_exp_residuals==TRUE){
+  write.table(pcs,paste0(name,"_full_residualexpression_PCs.txt"))
+}else{
+  write.table(pcs,paste0(name,"_full_expression_PCs.txt"))
+}
+
 
 ####################################
 ### OPTIMIZE N_PCS #################
@@ -379,7 +368,6 @@ if(optimize_pcs==TRUE && covadj_pc_matrixeqtl==TRUE){
         name=name,
         cov_file=cov_file,
         geno_pcs_adj=geno_pc_adj,
-        geno_pcs_n=geno_pcs_n,
         covs_to_include=covs)
 
     best_pcs=best_pcs$pcs[1]
