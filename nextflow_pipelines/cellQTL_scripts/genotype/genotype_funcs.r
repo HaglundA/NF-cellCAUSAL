@@ -1,4 +1,13 @@
 
+#### packages required 
+
+# install.packages("SeqArray")
+# install.packages("data.table")
+# install.packages("dplyr")
+# install.packages("GenomicRanges")
+# install.packages("BSgenome.Hsapiens.UCSC.hg19")
+
+
 
 chrpos_to_rsid=function(chromlocs,build=c("hg37","hg38")){
 
